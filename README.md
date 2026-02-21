@@ -47,27 +47,18 @@ The core logic of this project lies in the `download_music.sh` script, which ope
    - 사용자로부터 **폴더명(앨범/아티스트)**과 **YouTube URL(플레이리스트 또는 단일 곡)**을 입력받습니다.
    - Receives **Folder Name (Album/Artist)** and **YouTube URL (Playlist or Single Track)** from the user.
 
-2. **경로 자동 설정 (Auto Path Configuration)**:
-   - Navidrome이 마운트된 경로(`BASE_DIR`) 하위에 지정한 폴더명으로 디렉토리를 생성하고 이동합니다.
-   - Creates a directory with the specified folder name under the path where Navidrome is mounted (`BASE_DIR`) and navigates to it.
+2. **자동화 파이프라인 (Automated Pipeline)**
+   - **경로 생성 (Path Creation)**: Navidrome 마운트 경로에 자동으로 폴더를 생성합니다.
+   - **메타데이터 (Metadata)**: `yt-dlp`를 사용하여 썸네일, 아티스트, 앨범 정보를 임베딩합니다.
+   - **중복 방지 (Duplicate Prevention)**: `downloaded.txt` 파일에 다운로드 기록을 저장하여, 이미 받은 곡은 건너뛰고 새로운 곡만 다운로드합니다. 따라서 유튜브 플레이리스트에 곡이 추가되었을 때, 동일한 URL로 다시 실행하면 **추가된 곡만 자동으로 다운로드**됩니다.
+   - **플레이리스트 (Playlist)**: `.m3u` 파일을 자동 생성하여 Navidrome에서 즉시 인식 가능합니다.
+   - **라이브러리 갱신 (Rescan)**: 작업 완료 후 Navidrome API를 호출하여 라이브러리를 자동 스캔합니다.
 
-3. **지능형 다운로드 & 태깅 (Intelligent Download & Tagging with `yt-dlp`)**:
-   - 고음질 MP3로 추출하며, 앨범 아트(썸네일)와 메타데이터를 자동으로 삽입합니다.
-   - Extracts high-quality MP3s and automatically embeds album art (thumbnails) and metadata.
-   - 트랙 번호, 아티스트 정보 등을 깔끔하게 정리하여 Navidrome이 완벽하게 인식하도록 돕습니다.
-   - Cleanly organizes track numbers, artist info, etc., ensuring perfect recognition by Navidrome.
-
-4. **플레이리스트 생성 (Playlist Creation - `.m3u`)**:
-   - 다운로드된 파일들을 기반으로 `.m3u` 플레이리스트 파일을 자동으로 생성합니다.
-   - Automatically generates an `.m3u` playlist file based on the downloaded files.
-   - Navidrome에서 별도의 설정 없이 바로 플레이리스트로 인식됩니다.
-   - Recognized immediately as a playlist in Navidrome without additional configuration.
-
-5. **Navidrome 자동 갱신 (Navidrome Auto Rescan)**:
-   - 모든 작업이 완료되면 Navidrome API를 호출하여 라이브러리 스캔(Rescan)을 요청합니다.
-   - Calls the Navidrome API to request a library scan (Rescan) once all tasks are completed.
-   - 사용자는 별도로 '새로고침'을 누를 필요 없이 즉시 추가된 음악을 감상할 수 있습니다.
-   - Users can enjoy the added music immediately without needing to manually refresh.
+   - **Path Creation**: Automatically creates folders in the Navidrome mount path.
+   - **Metadata**: Uses `yt-dlp` to embed thumbnails, artist, and album info.
+   - **Duplicate Prevention**: Records download history in `downloaded.txt` to skip already downloaded tracks. You can simply re-run the same playlist URL to **download only the newly added tracks**.
+   - **Playlist**: Automatically generates `.m3u` files for instant Navidrome recognition.
+   - **Rescan**: Triggers a Navidrome library scan via API upon completion.
 
 ---
 
