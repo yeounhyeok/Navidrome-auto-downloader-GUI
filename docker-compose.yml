@@ -1,0 +1,16 @@
+services:
+  navidrome-downloader:
+    build: .
+    container_name: navidrome-downloader
+    ports:
+      - "5000:5000"
+    volumes:
+      - /mnt/usb/media/Musics:/music
+    environment:
+      - ND_URL=${ND_URL}
+      - ND_USER=${ND_USER}
+      - ND_PASS=${ND_PASS}
+      - BASE_DIR=${BASE_DIR}
+    env_file:
+      - .env
+    restart: unless-stopped

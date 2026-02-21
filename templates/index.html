@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Navidrome Auto Downloader</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; }
+        input[type="text"] { width: 100%; padding: 0.5rem; }
+        button { padding: 0.5rem 1rem; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #log { background: #f4f4f4; padding: 1rem; margin-top: 1rem; white-space: pre-wrap; height: 300px; overflow-y: scroll; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <h1>Navidrome Auto Downloader</h1>
+    <form id="downloadForm">
+        <div class="form-group">
+            <label for="folder_name">Folder Name (Album/Artist):</label>
+            <input type="text" id="folder_name" name="folder_name" required>
+        </div>
+        <div class="form-group">
+            <label for="youtube_url">YouTube/Playlist URL:</label>
+            <input type="text" id="youtube_url" name="youtube_url" required>
+        </div>
+        <button type="submit">Start Download</button>
+    </form>
+    
+    <div id="log">Logs will appear here...</div>
+
+    <script>
+        document.getElementById('downloadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const logDiv = document.getElementById('log');
+            logDiv.textContent = "Starting process...\n";
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value);
+                    logDiv.textContent += text;
+                    logDiv.scrollTop = logDiv.scrollHeight;
+                }
+            } catch (err) {
+                logDiv.textContent += `Error: ${err.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

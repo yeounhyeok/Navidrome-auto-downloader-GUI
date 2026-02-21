@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Environment variables
+.env
+
+# User data
+downloaded.txt
+*.m3u
+*.mp3
+*.jpg
