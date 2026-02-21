@@ -38,14 +38,14 @@ The system operates by combining a Flask web server and Shell Script within a Do
 ```
 
 ## ✨ Features (Pipeline)
-
 이 프로젝트의 핵심 로직은 `download_music.sh` 스크립트에 있으며, 다음과 같은 5단계 파이프라인으로 동작합니다:
-
 The core logic of this project lies in the `download_music.sh` script, which operates in a 5-step pipeline:
 
 1. **입력 및 준비 (Input & Preparation)**:
-   - 사용자로부터 **폴더명(앨범/아티스트)**과 **YouTube URL(플레이리스트 또는 단일 곡)**을 입력받습니다.
-   - Receives **Folder Name (Album/Artist)** and **YouTube URL (Playlist or Single Track)** from the user.
+   - **폴더 관리 (Folder Management)**: 마운트된 볼륨을 자동으로 스캔하여 기존 폴더 목록을 드롭다운으로 제공합니다. 새 폴더를 생성하거나 기존 폴더를 선택할 수 있습니다.
+   - **스마트 URL (Smart URL Recall)**: 기존 폴더를 선택하면 이전에 사용했던 YouTube URL이 자동으로 입력되고 잠금 처리되어, 실수 없이 간편하게 업데이트할 수 있습니다.
+   - **Folder Management**: Scans mounted volumes to provide a dropdown of existing folders. You can create a new folder or select an existing one.
+   - **Smart URL Recall**: Selecting an existing folder automatically fills and locks the previously used YouTube URL, ensuring error-free updates.
 
 2. **자동화 파이프라인 (Automated Pipeline)**
    - **경로 생성 (Path Creation)**: Navidrome 마운트 경로에 자동으로 폴더를 생성합니다.

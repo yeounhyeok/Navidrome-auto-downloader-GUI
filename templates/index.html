@@ -6,19 +6,28 @@
         body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
         .form-group { margin-bottom: 1rem; }
         label { display: block; margin-bottom: 0.5rem; }
-        input[type="text"] { width: 100%; padding: 0.5rem; }
+        input[type="text"], select { width: 100%; padding: 0.5rem; box-sizing: border-box; }
         button { padding: 0.5rem 1rem; background: #007bff; color: white; border: none; cursor: pointer; }
         button:hover { background: #0056b3; }
         #log { background: #f4f4f4; padding: 1rem; margin-top: 1rem; white-space: pre-wrap; height: 300px; overflow-y: scroll; border: 1px solid #ddd; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
     <h1>Navidrome Auto Downloader</h1>
     <form id="downloadForm">
         <div class="form-group">
-            <label for="folder_name">Folder Name (Album/Artist):</label>
-            <input type="text" id="folder_name" name="folder_name" required>
+            <label for="folder_select">Select Folder:</label>
+            <select id="folder_select" name="folder_name">
+                <option value="">-- Loading folders... --</option>
+            </select>
         </div>
+
+        <div class="form-group hidden" id="new_folder_group">
+            <label for="new_folder_name">New Folder Name (Album/Artist):</label>
+            <input type="text" id="new_folder_name" name="new_folder_name" placeholder="Enter new folder name">
+        </div>
+
         <div class="form-group">
             <label for="youtube_url">YouTube/Playlist URL:</label>
             <input type="text" id="youtube_url" name="youtube_url" required>
@@ -29,6 +38,64 @@
     <div id="log">Logs will appear here...</div>
 
     <script>
+        const folderSelect = document.getElementById('folder_select');
+        const newFolderGroup = document.getElementById('new_folder_group');
+        const newFolderInput = document.getElementById('new_folder_name');
+        const urlInput = document.getElementById('youtube_url');
+        
+        let folderData = {};
+
+        // Load folders on startup
+        async function loadFolders() {
+            try {
+                const response = await fetch('/folders');
+                const folders = await response.json();
+                
+                folderSelect.innerHTML = '<option value="new">-- Create New Folder --</option>';
+                
+                folders.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.name;
+                    option.textContent = folder.name;
+                    folderSelect.appendChild(option);
+                    folderData[folder.name] = folder.url;
+                });
+
+                // Trigger change event to set initial state
+                folderSelect.dispatchEvent(new Event('change'));
+
+            } catch (err) {
+                console.error("Failed to load folders:", err);
+                folderSelect.innerHTML = '<option value="new">-- Error loading folders --</option>';
+            }
+        }
+
+        // Handle folder selection change
+        folderSelect.addEventListener('change', () => {
+            const selected = folderSelect.value;
+            
+            if (selected === 'new') {
+                newFolderGroup.classList.remove('hidden');
+                newFolderInput.required = true;
+                urlInput.value = '';
+                urlInput.readOnly = false;
+            } else {
+                newFolderGroup.classList.add('hidden');
+                newFolderInput.required = false;
+                
+                const savedUrl = folderData[selected];
+                if (savedUrl) {
+                    urlInput.value = savedUrl;
+                    urlInput.readOnly = true; // Lock URL if it exists
+                } else {
+                    urlInput.value = '';
+                    urlInput.readOnly = false; // Allow editing if no URL saved
+                }
+            }
+        });
+
+        loadFolders();
+
         document.getElementById('downloadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const logDiv = document.getElementById('log');
@@ -52,6 +119,10 @@
                     logDiv.textContent += text;
                     logDiv.scrollTop = logDiv.scrollHeight;
                 }
+                
+                // Refresh folder list after download completes (to show new folder/URL)
+                loadFolders();
+
             } catch (err) {
                 logDiv.textContent += `Error: ${err.message}`;
             }

@@ -21,6 +21,10 @@ TARGET_DIR="$BASE_DIR/$FOLDER_NAME"
 echo "------------------------------------------"
 echo "Process Start: $FOLDER_NAME"
 
+# Save URL to a file for future updates
+mkdir -p "$TARGET_DIR"
+echo "$URL" > "$TARGET_DIR/playlist_url.txt"
+
 # 1~3. Download Logic
 # No sudo needed as it runs as root inside Docker
 mkdir -p "$TARGET_DIR"

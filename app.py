@@ -1,24 +1,48 @@
-from flask import Flask, render_template, request, Response, stream_with_context
+from flask import Flask, render_template, request, Response, stream_with_context, jsonify
 import subprocess
 import os
 
 app = Flask(__name__)
 
+# Base directory for music (should match docker-compose volume)
+BASE_DIR = os.environ.get('BASE_DIR', '/music')
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/folders', methods=['GET'])
+def get_folders():
+    folders = []
+    if os.path.exists(BASE_DIR):
+        for entry in os.scandir(BASE_DIR):
+            if entry.is_dir():
+                url_file_path = os.path.join(entry.path, 'playlist_url.txt')
+                url = ""
+                if os.path.exists(url_file_path):
+                    try:
+                        with open(url_file_path, 'r') as f:
+                            url = f.read().strip()
+                    except:
+                        pass
+                folders.append({'name': entry.name, 'url': url})
+    return jsonify(folders)
+
 @app.route('/download', methods=['POST'])
 def download():
     folder_name = request.form.get('folder_name')
+    new_folder_name = request.form.get('new_folder_name')
     youtube_url = request.form.get('youtube_url')
     
-    if not folder_name or not youtube_url:
+    # Use new folder name if provided, otherwise use selected folder
+    target_folder = new_folder_name if new_folder_name else folder_name
+    
+    if not target_folder or not youtube_url:
         return "Missing arguments", 400
 
     def generate():
         # Execute the shell script
-        cmd = ['./download_music.sh', folder_name, youtube_url]
+        cmd = ['./download_music.sh', target_folder, youtube_url]
         
         yield f"Executing: {' '.join(cmd)}\n"
         
