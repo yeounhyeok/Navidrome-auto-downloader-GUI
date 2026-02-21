@@ -78,22 +78,64 @@ The core logic of this project lies in the `download_music.sh` script, which ope
 
 ### Installation & Run
 
+#### Option 1: Use Docker Image (Recommended)
+별도의 빌드 과정 없이 GitHub Container Registry에 올라온 이미지를 바로 사용할 수 있습니다.
+You can use the image directly from the GitHub Container Registry without building it yourself.
+
+1. **`docker-compose.yml` 작성 (Create `docker-compose.yml`)**
+   ```yaml
+   services:
+     navidrome-downloader:
+       image: ghcr.io/yeounhyeok/navidrome-auto-downloader-gui:latest
+       container_name: navidrome-downloader
+       ports:
+         - "5000:5000"
+       volumes:
+         - /path/to/your/music:/music
+       # Load environment variables from .env file
+       env_file:
+         - .env
+       restart: unless-stopped
+   ```
+
+2. **환경 변수 설정 (Configure Environment Variables)**
+   `.env.example` 파일을 복사하여 `.env` 파일을 생성하고, 본인의 Navidrome 정보를 입력하세요.
+   Copy the `.env.example` file to `.env` and fill in your Navidrome details.
+
+   ```bash
+   # Download .env.example if you don't have the repo
+   wget https://raw.githubusercontent.com/yeounhyeok/Navidrome-auto-downloader-GUI/main/.env.example -O .env
+   
+   # Edit .env file
+   vi .env
+   ```
+
+3. **실행 (Run)**
+   ```bash
+   docker-compose up -d
+   ```
+
+#### Option 2: Build Manually (Developer)
+
 1. **리포지토리 클론 (Clone Repository)**
    ```bash
    git clone https://github.com/yeounhyeok/Navidrome-auto-downloader-GUI.git
    cd Navidrome-auto-downloader-GUI
    ```
 
-2. **환경 설정 (Configuration)** - `docker-compose.yml`
-   `docker-compose.yml` 파일을 열어 Navidrome 접속 정보와 볼륨 경로를 수정하거나, `.env` 파일을 생성하여 관리하세요.
-   Modify Navidrome connection info and volume paths in `docker-compose.yml`, or create a `.env` file.
+2. **환경 설정 (Configuration)**
+   `.env.example` 파일을 `.env`로 복사하여 설정을 완료하세요.
+   Copy `.env.example` to `.env` and configure your settings.
+
+   ```bash
+   cp .env.example .env
+   vi .env
+   ```
+
+   `docker-compose.yml`에서 볼륨 경로를 수정하세요.
+   Modify volume paths in `docker-compose.yml`.
 
    ```yaml
-   environment:
-     - ND_URL=${ND_URL}
-     - ND_USER=${ND_USER}
-     - ND_PASS=${ND_PASS}
-     - BASE_DIR=${BASE_DIR}
    volumes:
      - /path/to/your/music:/music
    ```
