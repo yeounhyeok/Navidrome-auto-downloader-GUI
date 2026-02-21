@@ -40,6 +40,7 @@ The system operates by combining a Flask web server and Shell Script within a Do
 ## ✨ Features (Pipeline)
 
 이 프로젝트의 핵심 로직은 `download_music.sh` 스크립트에 있으며, 다음과 같은 5단계 파이프라인으로 동작합니다:
+
 The core logic of this project lies in the `download_music.sh` script, which operates in a 5-step pipeline:
 
 1. **입력 및 준비 (Input & Preparation)**:
@@ -80,6 +81,7 @@ The core logic of this project lies in the `download_music.sh` script, which ope
 
 #### Option 1: Use Docker Image (Recommended)
 별도의 빌드 과정 없이 GitHub Container Registry에 올라온 이미지를 바로 사용할 수 있습니다.
+
 You can use the image directly from the GitHub Container Registry without building it yourself.
 
 1. **`docker-compose.yml` 작성 (Create `docker-compose.yml`)**
@@ -100,6 +102,7 @@ You can use the image directly from the GitHub Container Registry without buildi
 
 2. **환경 변수 설정 (Configure Environment Variables)**
    `.env.example` 파일을 복사하여 `.env` 파일을 생성하고, 본인의 Navidrome 정보를 입력하세요.
+   
    Copy the `.env.example` file to `.env` and fill in your Navidrome details.
 
    ```bash
@@ -125,6 +128,7 @@ You can use the image directly from the GitHub Container Registry without buildi
 
 2. **환경 설정 (Configuration)**
    `.env.example` 파일을 `.env`로 복사하여 설정을 완료하세요.
+   
    Copy `.env.example` to `.env` and configure your settings.
 
    ```bash
@@ -133,6 +137,7 @@ You can use the image directly from the GitHub Container Registry without buildi
    ```
 
    `docker-compose.yml`에서 볼륨 경로를 수정하세요.
+   
    Modify volume paths in `docker-compose.yml`.
 
    ```yaml
@@ -147,6 +152,7 @@ You can use the image directly from the GitHub Container Registry without buildi
 
 4. **접속 (Access)**
    웹 브라우저에서 `http://localhost:5000`으로 접속합니다.
+   
    Access `http://localhost:5000` in your web browser.
 
 ---
