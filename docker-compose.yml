@@ -1,12 +1,11 @@
 services:
     navidrome-downloader:
-      build: .
       image: ghcr.io/yeounhyeok/navidrome-auto-downloader-gui:latest
       container_name: navidrome-downloader
       ports:
         - "5000:5000"
       volumes:
-        - ./testmusic:/music
+        - /path/to/your/music:/music
       # Load environment variables from .env file
       env_file:
         - .env
