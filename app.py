@@ -4,6 +4,7 @@ import os
 import threading
 import time
 import json
+import signal
 
 app = Flask(__name__)
 
@@ -32,7 +33,8 @@ def run_download_task(cmd):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1
+            bufsize=1,
+            start_new_session=True # Create new process group
         )
         task_manager.process = process
         
@@ -48,6 +50,18 @@ def run_download_task(cmd):
     finally:
         task_manager.is_running = False
         task_manager.process = None
+
+def stop_download_task():
+    """Stops the currently running download task."""
+    if task_manager.process and task_manager.process.poll() is None:
+        try:
+            # Kill the process group to ensure all child processes (like yt-dlp) are also killed
+            os.killpg(os.getpgid(task_manager.process.pid), signal.SIGTERM)
+            task_manager.logs.append("\n!!! Process group stopped by user !!!\n")
+            return True
+        except ProcessLookupError:
+            return False
+    return False
 
 @app.route('/')
 def index():
@@ -94,6 +108,16 @@ def download():
     thread.start()
 
     return jsonify({"status": "started", "message": "Download started in background."})
+
+@app.route('/stop', methods=['POST'])
+def stop():
+    if not task_manager.is_running:
+        return jsonify({"status": "error", "message": "No task is running."}), 400
+    
+    if stop_download_task():
+        return jsonify({"status": "stopped", "message": "Download task stopped."})
+    else:
+        return jsonify({"status": "error", "message": "Failed to stop task or task already finished."}), 500
 
 @app.route('/stream')
 def stream():

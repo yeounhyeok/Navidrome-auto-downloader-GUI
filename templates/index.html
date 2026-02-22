@@ -32,7 +32,10 @@
             <label for="youtube_url">YouTube/Playlist URL:</label>
             <input type="text" id="youtube_url" name="youtube_url" required>
         </div>
-        <button type="submit">Start Download</button>
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" id="startBtn">Start Download</button>
+            <button type="button" id="stopBtn" style="background-color: #dc3545;" disabled>Stop</button>
+        </div>
     </form>
     
     <div id="log">Logs will appear here...</div>
@@ -42,6 +45,8 @@
         const newFolderGroup = document.getElementById('new_folder_group');
         const newFolderInput = document.getElementById('new_folder_name');
         const urlInput = document.getElementById('youtube_url');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
         
         let folderData = {};
 
@@ -99,10 +104,10 @@
         document.getElementById('downloadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const logDiv = document.getElementById('log');
-            const submitBtn = e.target.querySelector('button');
             
             logDiv.textContent = "Requesting download...\n";
-            submitBtn.disabled = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
             
             const formData = new FormData(e.target);
             
@@ -135,7 +140,8 @@
                     if (data === "[DONE]") {
                         evtSource.close();
                         loadFolders(); // Refresh folder list
-                        submitBtn.disabled = false;
+                        startBtn.disabled = false;
+                        stopBtn.disabled = true;
                         logDiv.textContent += "\n--- Task Completed ---\n";
                         return;
                     }
@@ -150,12 +156,36 @@
                     // For this simple app, we can close it to prevent infinite errors if server dies.
                     console.log("EventSource connection error/closed.");
                     evtSource.close();
-                    submitBtn.disabled = false;
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
                 };
 
             } catch (err) {
                 logDiv.textContent += `Error: ${err.message}`;
-                submitBtn.disabled = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        });
+
+        // Handle Stop Button
+        stopBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to stop the download?')) return;
+            
+            try {
+                const response = await fetch('/stop', { method: 'POST' });
+                const result = await response.json();
+                
+                const logDiv = document.getElementById('log');
+                logDiv.textContent += `\n[System] ${result.message}\n`;
+                
+                if (response.ok) {
+                    stopBtn.disabled = true;
+                    // startBtn will be re-enabled when SSE receives [DONE] or connection closes
+                    // But to be sure, we can re-enable it here if SSE doesn't send DONE immediately
+                }
+            } catch (err) {
+                console.error("Failed to stop:", err);
+                alert("Failed to stop task: " + err.message);
             }
         });
     </script>
