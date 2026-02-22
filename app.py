@@ -151,7 +151,10 @@ def stream():
             
             time.sleep(0.5) # Polling interval
 
-    return Response(stream_with_context(event_stream()), mimetype='text/event-stream')
+    response = Response(stream_with_context(event_stream()), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no' # Important for Nginx/Reverse Proxies to disable buffering
+    return response
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
