@@ -105,9 +105,21 @@ You can use the image directly from the GitHub Container Registry without buildi
    ```
 
 3. **실행 (Run)**
-   ```bash
-   docker-compose up -d
-   ```
+      ```bash
+      docker-compose up -d
+      ```
+   
+   4. **업데이트 (Update)**
+      ```bash
+      # 최신 이미지 다운로드
+      docker-compose pull
+      
+      # 컨테이너 재생성 (업데이트 적용)
+      docker-compose up -d
+      
+      # (선택) 이전 이미지 삭제
+      docker image prune -f
+      ```
 
 #### Option 2: Build Manually (Developer)
 
