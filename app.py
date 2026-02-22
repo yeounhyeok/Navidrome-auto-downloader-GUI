@@ -5,6 +5,7 @@ import threading
 import time
 import json
 import signal
+import sys
 
 app = Flask(__name__)
 
@@ -15,19 +16,21 @@ BASE_DIR = os.environ.get('BASE_DIR', '/music')
 class TaskManager:
     def __init__(self):
         self.is_running = False
-        self.logs = []
+        self.logs = [] # Keep logs in memory for UI
         self.process = None
 
 task_manager = TaskManager()
 
 def run_download_task(cmd):
-    """Background task to run the shell script and capture logs."""
+    """Background task to run the shell script, output to Docker logs (stdout), and capture for UI."""
     task_manager.is_running = True
     task_manager.logs = [] # Clear logs for new run
     
+    start_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Executing: {' '.join(cmd)}\n"
+    print(start_msg.strip(), flush=True) # To Docker Logs
+    task_manager.logs.append(start_msg)  # To UI
+    
     try:
-        task_manager.logs.append(f"Executing: {' '.join(cmd)}\n")
-        
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -39,13 +42,18 @@ def run_download_task(cmd):
         task_manager.process = process
         
         for line in process.stdout:
-            task_manager.logs.append(line)
+            print(line.strip(), flush=True) # To Docker Logs
+            task_manager.logs.append(line)  # To UI
             
         process.wait()
-        task_manager.logs.append(f"\nProcess finished with exit code {process.returncode}")
+        end_msg = f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Process finished with exit code {process.returncode}"
+        print(end_msg.strip(), flush=True) # To Docker Logs
+        task_manager.logs.append(end_msg)  # To UI
         
     except Exception as e:
-        task_manager.logs.append(f"\nError occurred: {str(e)}\n")
+        err_msg = f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Error occurred: {str(e)}\n"
+        print(err_msg.strip(), flush=True) # To Docker Logs
+        task_manager.logs.append(err_msg)  # To UI
         
     finally:
         task_manager.is_running = False
@@ -57,7 +65,9 @@ def stop_download_task():
         try:
             # Kill the process group to ensure all child processes (like yt-dlp) are also killed
             os.killpg(os.getpgid(task_manager.process.pid), signal.SIGTERM)
-            task_manager.logs.append("\n!!! Process group stopped by user !!!\n")
+            stop_msg = f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] !!! Process group stopped by user !!!\n"
+            print(stop_msg.strip(), flush=True) # To Docker Logs
+            task_manager.logs.append(stop_msg)  # To UI
             return True
         except ProcessLookupError:
             return False
@@ -141,7 +151,10 @@ def stream():
             
             time.sleep(0.5) # Polling interval
 
-    return Response(stream_with_context(event_stream()), mimetype='text/event-stream')
+    response = Response(stream_with_context(event_stream()), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no' # Important for Nginx/Reverse Proxies to disable buffering
+    return response
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
