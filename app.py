@@ -102,7 +102,8 @@ def download():
     folder_name = request.form.get('folder_name')
     new_folder_name = request.form.get('new_folder_name')
     youtube_url = request.form.get('youtube_url')
-    
+    sync_delete = 'true' if request.form.get('sync_delete') else 'false'
+
     # Use new folder name if provided, otherwise use selected folder
     target_folder = new_folder_name if new_folder_name else folder_name
     
@@ -110,7 +111,7 @@ def download():
         return jsonify({"status": "error", "message": "Missing arguments"}), 400
 
     # Prepare command
-    cmd = ['./download_music.sh', target_folder, youtube_url]
+    cmd = ['./download_music.sh', target_folder, youtube_url, sync_delete]
     
     # Start background thread
     thread = threading.Thread(target=run_download_task, args=(cmd,))
@@ -118,6 +119,29 @@ def download():
     thread.start()
 
     return jsonify({"status": "started", "message": "Download started in background."})
+
+@app.route('/reset', methods=['POST'])
+def reset_folder():
+    if task_manager.is_running:
+        return jsonify({"status": "error", "message": "A download task is already running."}), 409
+
+    folder_name = request.form.get('folder_name')
+    if not folder_name:
+        return jsonify({"status": "error", "message": "Missing folder name"}), 400
+
+    folder_path = os.path.join(BASE_DIR, folder_name)
+    if not os.path.isdir(folder_path):
+        return jsonify({"status": "error", "message": "Folder not found"}), 404
+
+    removed = []
+    for fname in ['downloaded.txt', '.id_map.txt']:
+        fpath = os.path.join(folder_path, fname)
+        if os.path.exists(fpath):
+            os.remove(fpath)
+            removed.append(fname)
+
+    msg = f"Reset complete: removed {', '.join(removed) if removed else 'nothing (already clean)'}. Re-run download to rebuild."
+    return jsonify({"status": "ok", "message": msg})
 
 @app.route('/stop', methods=['POST'])
 def stop():

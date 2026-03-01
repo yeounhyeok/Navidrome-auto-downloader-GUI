@@ -7,13 +7,14 @@ ND_USER="${ND_USER}"
 ND_PASS="${ND_PASS}"
 # ---------------------------------
 
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 \"Folder_Name\" \"Youtube_URL\""
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 \"Folder_Name\" \"Youtube_URL\" [sync_delete]"
     exit 1
 fi
 
 FOLDER_NAME="$1"
 URL=$(echo "$2" | sed 's/\\//g')
+SYNC_DELETE="${3:-false}"
 # Mount path inside Docker (Default value)
 BASE_DIR="${BASE_DIR:-/music}"
 TARGET_DIR="$BASE_DIR/$FOLDER_NAME"
@@ -29,15 +30,82 @@ echo "$URL" > "$TARGET_DIR/playlist_url.txt"
 # No sudo needed as it runs as root inside Docker
 mkdir -p "$TARGET_DIR"
 cd "$TARGET_DIR" || exit
-yt-dlp -x --audio-format mp3 --audio-quality 0 \
-    --embed-metadata --embed-thumbnail --convert-thumbnails jpg \
+yt-dlp \
+    -x \
+    --audio-format mp3 \
+    --audio-quality 0 \
+    --embed-metadata \
+    --embed-thumbnail \
+    --convert-thumbnails jpg \
     --download-archive "downloaded.txt" \
-    --parse-metadata "playlist_index:%(track_number)s" \
-    --replace-in-metadata "title" " \(?Official (Video|Audio|Music Video|M/V)\)?" "" \
-    -o "%(playlist_index)s - %(title)s.%(ext)s" \
+    --add-metadata \
+    --replace-in-metadata "uploader" "(?i)\s*-\s*topic$" "" \
+    --parse-metadata "title:(?P<artist>[^【】「」『』\[]+?)\s*[-–—]\s*(?P<title>.+)" \
+    --parse-metadata "title:\[(?P<artist>[^\]]+)\]\s*(?P<title>.+)" \
+    --parse-metadata "title:(?P<artist>[^「『\s][^「『]*?)\s*[「『](?P<title>[^」』]+)[」』]" \
+    --parse-metadata "title:【(?P<artist>[^】]+)】\s*(?P<title>.+)" \
+    --replace-in-metadata "title" "【[^】]*】" "" \
+    --replace-in-metadata "title" "「[^」]*」" "" \
+    --replace-in-metadata "title" "『[^』]*』" "" \
+    --replace-in-metadata "title" "\s*[\(\[（【]\s*(?:Official\s+)?(?:Audio|Video|Music\s*Video|MV|M/V|Lyric\s*Video|Visualizer|Live|Official)\s*[\)\]）】]" "" \
+    --replace-in-metadata "title" "^\s+" "" \
+    --replace-in-metadata "title" "\s+$" "" \
+    --print-to-file "%(id)s	%(artist,uploader)s - %(title)s.mp3" ".id_map.txt" \
+    -o "%(artist,uploader)s - %(title)s.%(ext)s" \
     "$URL"
 
-# 4. Playlist & Permission
+# 4. Sync-delete: remove tracks no longer in the playlist
+if [ "$SYNC_DELETE" = "true" ]; then
+    echo ""
+    echo "Checking for tracks removed from playlist..."
+
+    CURRENT_IDS_FILE=$(mktemp)
+    yt-dlp --flat-playlist --print "%(id)s" "$URL" 2>/dev/null > "$CURRENT_IDS_FILE"
+
+    if [ -s "$CURRENT_IDS_FILE" ]; then
+        deleted_count=0
+        NEW_MAP=$(mktemp)
+
+        # Process entries tracked in .id_map.txt
+        if [ -f ".id_map.txt" ]; then
+            while IFS="	" read -r video_id filename; do
+                [ -z "$video_id" ] && continue
+                if grep -qxF "$video_id" "$CURRENT_IDS_FILE"; then
+                    printf '%s\t%s\n' "$video_id" "$filename" >> "$NEW_MAP"
+                else
+                    if [ -f "$filename" ]; then
+                        rm "$filename"
+                        echo "  Deleted: $filename"
+                        deleted_count=$((deleted_count + 1))
+                    else
+                        echo "  WARNING: File not found on disk (skipped): $filename"
+                    fi
+                    grep -v "^youtube ${video_id}$" downloaded.txt > /tmp/_arch_$$.txt \
+                        && mv /tmp/_arch_$$.txt downloaded.txt || true
+                fi
+            done < ".id_map.txt"
+            mv "$NEW_MAP" .id_map.txt
+        fi
+
+        # Delete orphaned mp3 files: on disk but not in the kept id_map entries
+        for mp3file in *.mp3; do
+            [ -f "$mp3file" ] || continue
+            if ! grep -qF "	${mp3file}" .id_map.txt 2>/dev/null; then
+                rm "$mp3file"
+                echo "  Deleted orphan: $mp3file"
+                deleted_count=$((deleted_count + 1))
+            fi
+        done
+
+        echo "Sync complete: deleted ${deleted_count} removed track(s)."
+    else
+        echo "Failed to fetch playlist. Sync skipped."
+    fi
+
+    rm -f "$CURRENT_IDS_FILE"
+fi
+
+# 5. Playlist & Permission
 # Create m3u playlist
 ls -1v *.mp3 2>/dev/null > "${FOLDER_NAME}.m3u"
 
@@ -45,7 +113,7 @@ ls -1v *.mp3 2>/dev/null > "${FOLDER_NAME}.m3u"
 chown -R 1000:1000 "$TARGET_DIR" 2>/dev/null || true
 chmod -R 755 "$TARGET_DIR" 2>/dev/null || true
 
-# 5. Navidrome API Rescan Request
+# 6. Navidrome API Rescan Request
 echo "Sending Rescan Request to Navidrome..."
 # Generate auth parameters compliant with Subsonic API
 SALT=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10)
