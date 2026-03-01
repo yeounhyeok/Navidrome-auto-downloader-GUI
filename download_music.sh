@@ -15,6 +15,12 @@ fi
 FOLDER_NAME="$1"
 URL=$(echo "$2" | sed 's/\\//g')
 SYNC_DELETE="${3:-false}"
+MIGRATE="${4:-false}"
+
+# Migrate mode forces sync_delete on
+if [ "$MIGRATE" = "true" ]; then
+    SYNC_DELETE="true"
+fi
 # Mount path inside Docker (Default value)
 BASE_DIR="${BASE_DIR:-/music}"
 TARGET_DIR="$BASE_DIR/$FOLDER_NAME"
@@ -30,6 +36,92 @@ echo "$URL" > "$TARGET_DIR/playlist_url.txt"
 # No sudo needed as it runs as root inside Docker
 mkdir -p "$TARGET_DIR"
 cd "$TARGET_DIR" || exit
+
+# Migrate mode: rename old files using embedded YouTube ID, pre-register correct ones
+if [ "$MIGRATE" = "true" ]; then
+    echo "Smart migration: scanning playlist metadata..."
+    rm -f downloaded.txt .id_map.txt
+
+    SCAN_TMP=$(mktemp)
+    yt-dlp \
+        --skip-download \
+        --replace-in-metadata "uploader" "(?i)\s*-\s*topic$" "" \
+        --parse-metadata "title:(?P<artist>[^【】「」『』\[]+?)\s*[-–—]\s*(?P<title>.+)" \
+        --parse-metadata "title:\[(?P<artist>[^\]]+)\]\s*(?P<title>.+)" \
+        --parse-metadata "title:(?P<artist>[^「『\s][^「『]*?)\s*[「『](?P<title>[^」』]+)[」』]" \
+        --parse-metadata "title:【(?P<artist>[^】]+)】\s*(?P<title>.+)" \
+        --replace-in-metadata "title" "【[^】]*】" "" \
+        --replace-in-metadata "title" "「[^」]*」" "" \
+        --replace-in-metadata "title" "『[^』]*』" "" \
+        --replace-in-metadata "title" "\s*[\(\[（【]\s*(?:Official\s+)?(?:Audio|Video|Music\s*Video|MV|M/V|Lyric\s*Video|Visualizer|Live|Official)\s*[\)\]）】]" "" \
+        --replace-in-metadata "title" "^\s+" "" \
+        --replace-in-metadata "title" "\s+$" "" \
+        --print-to-file "%(id)s	%(artist,uploader)s - %(title)s.mp3" "$SCAN_TMP" \
+        "$URL" 2>/dev/null
+
+    echo "Matching existing files by embedded metadata (no re-download)..."
+    python3 - "$SCAN_TMP" << 'PYEOF'
+import sys, os, subprocess, json, re
+
+scan_file = sys.argv[1]
+
+# Load expected: video_id -> new_filename
+id_map = {}
+with open(scan_file) as f:
+    for line in f:
+        line = line.rstrip('\n')
+        if '\t' in line:
+            vid, fname = line.split('\t', 1)
+            if vid:
+                id_map[vid] = fname
+
+pre_count = rename_count = 0
+
+for mp3file in sorted(f for f in os.listdir('.') if f.endswith('.mp3')):
+    # Read embedded metadata to find YouTube video ID
+    result = subprocess.run(
+        ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', mp3file],
+        capture_output=True, text=True
+    )
+    try:
+        tags = json.loads(result.stdout).get('format', {}).get('tags', {})
+    except Exception:
+        continue
+
+    vid = None
+    for key in ['PURL', 'purl', 'comment', 'COMMENT', 'description']:
+        match = re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})', str(tags.get(key, '')))
+        if match:
+            vid = match.group(1)
+            break
+
+    if not vid or vid not in id_map:
+        continue
+
+    expected = id_map[vid]
+
+    if mp3file == expected:
+        print(f"  OK (kept): {mp3file}")
+        pre_count += 1
+    elif not os.path.exists(expected):
+        os.rename(mp3file, expected)
+        print(f"  Renamed: {mp3file}")
+        print(f"      --> {expected}")
+        rename_count += 1
+    else:
+        # New-name file already exists, old file will be cleaned as orphan
+        continue
+
+    with open('downloaded.txt', 'a') as af:
+        af.write(f"youtube {vid}\n")
+    with open('.id_map.txt', 'a') as af:
+        af.write(f"{vid}\t{expected}\n")
+
+print(f"Result: {pre_count} kept, {rename_count} renamed. Remaining will be downloaded.")
+PYEOF
+
+    rm -f "$SCAN_TMP"
+fi
 yt-dlp \
     -x \
     --audio-format mp3 \
@@ -88,14 +180,17 @@ if [ "$SYNC_DELETE" = "true" ]; then
         fi
 
         # Delete orphaned mp3 files: on disk but not in the kept id_map entries
-        for mp3file in *.mp3; do
-            [ -f "$mp3file" ] || continue
-            if ! grep -qF "	${mp3file}" .id_map.txt 2>/dev/null; then
-                rm "$mp3file"
-                echo "  Deleted orphan: $mp3file"
-                deleted_count=$((deleted_count + 1))
-            fi
-        done
+        # Guard: only run if id_map exists, otherwise we have no info and cannot safely delete
+        if [ -f ".id_map.txt" ] && [ -s ".id_map.txt" ]; then
+            for mp3file in *.mp3; do
+                [ -f "$mp3file" ] || continue
+                if ! grep -qF "	${mp3file}" .id_map.txt 2>/dev/null; then
+                    rm "$mp3file"
+                    echo "  Deleted orphan: $mp3file"
+                    deleted_count=$((deleted_count + 1))
+                fi
+            done
+        fi
 
         echo "Sync complete: deleted ${deleted_count} removed track(s)."
     else

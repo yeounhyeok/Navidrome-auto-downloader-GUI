@@ -13,3 +13,4 @@ downloaded.txt
 *.m3u
 *.mp3
 *.jpg
+.DS_Store

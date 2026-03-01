@@ -103,6 +103,7 @@ def download():
     new_folder_name = request.form.get('new_folder_name')
     youtube_url = request.form.get('youtube_url')
     sync_delete = 'true' if request.form.get('sync_delete') else 'false'
+    migrate = 'true' if request.form.get('migrate') else 'false'
 
     # Use new folder name if provided, otherwise use selected folder
     target_folder = new_folder_name if new_folder_name else folder_name
@@ -111,7 +112,7 @@ def download():
         return jsonify({"status": "error", "message": "Missing arguments"}), 400
 
     # Prepare command
-    cmd = ['./download_music.sh', target_folder, youtube_url, sync_delete]
+    cmd = ['./download_music.sh', target_folder, youtube_url, sync_delete, migrate]
     
     # Start background thread
     thread = threading.Thread(target=run_download_task, args=(cmd,))
